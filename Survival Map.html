@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Карта помощи — Ноябрьск</title>
+
+<script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+
+<style>
+*{
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+  font-family:'Inter',sans-serif;
+}
+
+body{
+  background:#0b0c10;
+  color:#fff;
+}
+
+/* HERO */
+.hero{
+  height:100vh;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+  text-align:center;
+  padding:20px;
+  background:radial-gradient(circle at top,#1b1c24,#0b0c10);
+}
+
+.hero h1{
+  font-size:64px;
+  font-weight:800;
+  background:linear-gradient(90deg,#ff3b3b,#fff);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
+
+.hero p{
+  margin-top:20px;
+  max-width:700px;
+  font-size:18px;
+  color:#cfcfcf;
+  line-height:1.6;
+}
+
+.hero span{
+  display:block;
+  margin-top:6px;
+  opacity:0.9;
+}
+
+button{
+  margin-top:30px;
+  padding:14px 26px;
+  border:none;
+  border-radius:999px;
+  background:#ff2e2e;
+  color:white;
+  font-weight:600;
+  cursor:pointer;
+  transition:0.3s;
+}
+
+button:hover{
+  transform:scale(1.05);
+}
+#mapSection{
+  display:none;
+  padding:20px;
+}
+
+#map{
+  width:100%;
+  height:65vh;
+  border-radius:16px;
+  overflow:hidden;
+}
+
+/* PANEL */
+.panel{
+  display:flex;
+  gap:10px;
+  margin-top:15px;
+  flex-wrap:wrap;
+}
+
+.card{
+  padding:10px 14px;
+  background:#1c1d24;
+  border:1px solid #2a2b33;
+  border-radius:10px;
+  cursor:pointer;
+  transition:0.2s;
+}
+
+.card:hover{
+  background:#ff2e2e;
+  transform:translateY(-2px);
+}
+
+.crisis{
+  background:#ff2e2e;
+}
+
+.list{
+  margin-top:20px;
+  display:grid;
+  gap:10px;
+}
+
+.item{
+  background:#15161a;
+  padding:14px;
+  border-radius:12px;
+  border:1px solid #2a2b33;
+  cursor:pointer;
+  transition:0.2s;
+}
+
+.item:hover{
+  transform:translateX(6px);
+  border-color:#ff2e2e;
+}
+</style>
+</head>
+
+<body>
+
+<div class="hero">
+  <h1>Ты не один</h1>
+  <p>
+    Карта помощи для людей в тяжёлой жизненной ситуации
+  </p>
+
+  <button onclick="openMap()">Открыть карту помощи</button>
+</div>
+
+<div id="mapSection">
+
+  <div id="map"></div>
+
+  <div class="panel">
+    <div class="card" onclick="showAll()">Все точки</div>
+    <div class="card crisis" onclick="crisis()">Кризис</div>
+  </div>
+
+  <div class="list" id="list"></div>
+</div>
+
+<script>
+
+let map;
+let marks=[];
+let ready=false;
+
+const places=[
+{
+name:"Ковчег",
+coords:[63.190614, 75.424042],
+address:"Зимний переулок, 8",
+emoji:"🏠",
+desc:"Помощь с жильём и питанием людям в сложной жизненной ситуации"
+},
+{
+name:"Гармония (одежда)",
+coords:[63.194403, 75.434652],
+address:"ул. Ленина, 7",
+emoji:"🧥",
+desc:"Помощь людям без работы, жилья и документов. Выдача одежды"
+},
+{
+name:"Гармония (помощь)",
+coords:[63.194861, 75.452717],
+address:"ул. Дзержинского, 5",
+emoji:"🧠",
+desc:"Психологическая и медицинская поддержка"
+},
+{
+name:"Вселенная добра",
+coords:[63.201071, 75.424626],
+address:"ул. Холмогорская, 21Г",
+emoji:"💛",
+desc:"Помощь в трудоустройстве"
+}
+];
+
+function openMap(){
+const hero=document.querySelector('.hero');
+const section=document.getElementById('mapSection');
+
+
+hero.style.transition='0.4s ease';
+hero.style.opacity='0';
+hero.style.transform='translateY(-20px)';
+
+setTimeout(()=>{
+hero.style.display='none';
+
+
+section.style.display='block';
+section.style.opacity='0';
+section.style.transform='translateY(30px)';
+section.style.transition='0.6s ease';
+
+requestAnimationFrame(()=>{
+section.style.opacity='1';
+section.style.transform='translateY(0)';
+});
+
+
+if(!ready){
+ymaps.ready(init);
+ready=true;
+}
+},300);
+}
+
+function init(){
+map=new ymaps.Map("map",{
+center:[63.1999,75.45],
+zoom:13,
+controls:['zoomControl','fullscreenControl']
+});
+
+map.behaviors.enable('scrollZoom');
+
+renderList();
+showAll();
+}
+
+function clear(){
+marks.forEach(m=>map.geoObjects.remove(m));
+marks=[];
+}
+
+function icon(e){
+return {
+iconLayout:'default#imageWithContent',
+iconImageHref:'data:image/svg+xml;charset=UTF-8,'+
+encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='42' height='42'>
+<circle cx='21' cy='21' r='19' fill='#ff2e2e'/>
+<text x='50%' y='55%' text-anchor='middle' font-size='18' fill='white'>${e}</text>
+</svg>`),
+iconImageSize:[42,42]
+};
+}
+
+function add(p){
+let m=new ymaps.Placemark(p.coords,{
+balloonContent:`<b>${p.emoji} ${p.name}</b><br>${p.desc}<br>📍 ${p.address}`
+},icon(p.emoji));
+
+map.geoObjects.add(m);
+marks.push(m);
+}
+
+function showAll(){
+clear();
+places.forEach(add);
+}
+
+function crisis(){
+clear();
+places.filter(p=>p.name.includes("Ковчег")||p.name.includes("Гармония")).forEach(add);
+}
+
+function go(name){
+let p=places.find(x=>x.name===name);
+map.setCenter(p.coords,15);
+}
+
+function renderList(){
+document.getElementById("list").innerHTML=
+places.map(p=>
+`<div class="item" onclick="go('${p.name}')">
+<b>${p.emoji} ${p.name}</b><br>
+${p.desc}<br>
+📍 ${p.address}
+</div>`
+).join("");
+}
+
+</script>
+
+</body>
+</html>
